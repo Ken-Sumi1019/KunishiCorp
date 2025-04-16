@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>記録管理アプリ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+    }
+    /* 登録用の入力欄とボタン */
+    #nameInput {
+      padding: 5px;
+      font-size: 16px;
+    }
+    button {
+      margin: 2px;
+      padding: 5px 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    /* グリッドレイアウト：1行に5列、隙間（gap）なし */
+    #container {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+    }
+    .column {
+      border: 1px solid #ccc;
+      padding: 10px;
+      min-height: 300px;
+      box-sizing: border-box;
+    }
+    /* ユーザー名と削除ボタンを横並びに */
+    .header-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .header-container h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .header-container button {
+      font-size: 14px;
+      margin-left: 5px;
+    }
+    .buttons {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    /* ◯, △, □ボタンのサイズを固定 */
+    .buttons button {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+    }
+    /* 各記録のレイアウト */
+    .record {
+      border-bottom: 1px solid #ddd;
+      padding: 5px 0;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+    }
+    .record:last-child {
+      border-bottom: none;
+    }
+    .record .timestamp {
+      margin: 0 5px;
+      white-space: nowrap;
+    }
+    .record .symbol {
+      font-weight: bold;
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>記録管理アプリ</h1>
+  <div class="controls">
+    <!-- 名前の登録部分 -->
+    <input type="text" id="nameInput" placeholder="名前を入力">
+    <button id="registerNameBtn">登録</button>
+    <!-- チェックされた記録のみ削除 -->
+    <button id="deleteRecordsBtn">チェックされた記録の削除</button>
+    <!-- すべての記録削除（確認付き） -->
+    <button id="deleteAllRecordsBtn">すべての記録削除</button>
+  </div>
+  <!-- 各人の列を配置するコンテナ -->
+  <div id="container"></div>
+  
+  <script>
+    // 各人の名前とその記録を管理するデータ構造
+    let data = { persons: [] };
+
+    // localStorageから状態を読み込む
+    function loadData() {
+      const saved = localStorage.getItem("recordData");
+      if (saved) {
+        data = JSON.parse(saved);
+      }
+    }
+
+    // 状態をlocalStorageに保存する
+    function saveData() {
+      localStorage.setItem("recordData", JSON.stringify(data));
+    }
+
+    // UIの再描画：各人の列（カード）を生成する
+    function render() {
+      const container = document.getElementById("container");
+      container.innerHTML = "";
+      data.persons.forEach((person, pIndex) => {
+        // 各人の列（カード）を生成
+        const column = document.createElement("div");
+        column.className = "column";
+        column.setAttribute("data-person-index", pIndex);
+
+        // ヘッダー部分：名前とユーザー削除ボタン
+        const headerContainer = document.createElement("div");
+        headerContainer.className = "header-container";
+
+        const header = document.createElement("h3");
+        header.textContent = person.name;
+        headerContainer.appendChild(header);
+
+        const deleteUserBtn = document.createElement("button");
+        deleteUserBtn.textContent = "削除";
+        deleteUserBtn.addEventListener("click", function() {
+          deleteUser(pIndex);
+        });
+        headerContainer.appendChild(deleteUserBtn);
+        column.appendChild(headerContainer);
+
+        // ボタン群（◯, △, □）の作成
+        const btnContainer = document.createElement("div");
+        btnContainer.className = "buttons";
+        ["◯", "△", "□"].forEach(symbol => {
+          const btn = document.createElement("button");
+          btn.textContent = symbol;
+          btn.addEventListener("click", function() {
+            addRecord(pIndex, symbol);
+          });
+          btnContainer.appendChild(btn);
+        });
+        column.appendChild(btnContainer);
+
+        // 各記録のリスト
+        const recordsContainer = document.createElement("div");
+        recordsContainer.className = "records";
+        person.records.forEach(record => {
+          const recDiv = document.createElement("div");
+          recDiv.className = "record";
+          // 各記録にユニークなIDをdata属性として保持
+          recDiv.setAttribute("data-record-id", record.id);
+
+          // 削除用チェックボックス
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "deleteCheckbox";
+          recDiv.appendChild(checkbox);
+
+          // 時刻表示
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "timestamp";
+          timeSpan.textContent = record.timestamp;
+          recDiv.appendChild(timeSpan);
+
+          // 押したボタンの記号表示
+          const symbolSpan = document.createElement("span");
+          symbolSpan.className = "symbol";
+          symbolSpan.textContent = record.symbol;
+          recDiv.appendChild(symbolSpan);
+
+          recordsContainer.appendChild(recDiv);
+        });
+        column.appendChild(recordsContainer);
+        container.appendChild(column);
+      });
+    }
+
+    // 新規の人を追加する関数
+    function addPerson(name) {
+      if (!name) return;
+      data.persons.push({ name: name, records: [] });
+      saveData();
+      render();
+    }
+
+    // ユーザー（列）を削除する関数
+    function deleteUser(personIndex) {
+      if (confirm("このユーザーを削除してよろしいですか？")) {
+        data.persons.splice(personIndex, 1);
+        saveData();
+        render();
+      }
+    }
+
+    // ボタン押下により記録を追加する関数
+    function addRecord(personIndex, symbol) {
+      const now = new Date();
+      const timestamp = now.toLocaleString(); // ローカルの日時文字列を取得
+      // ユニークなIDとして日時（ミリ秒）と乱数を組み合わせる
+      const record = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        timestamp: timestamp,
+        symbol: symbol
+      };
+      data.persons[personIndex].records.push(record);
+      saveData();
+      render();
+    }
+
+    // チェック済み記録の削除処理
+    function deleteCheckedRecords() {
+      data.persons.forEach((person, pIndex) => {
+        const column = document.querySelector(`.column[data-person-index="${pIndex}"]`);
+        if (column) {
+          const recordsDiv = column.querySelector(".records");
+          const recordDivs = recordsDiv.querySelectorAll(".record");
+          recordDivs.forEach(recordDiv => {
+            const checkbox = recordDiv.querySelector(".deleteCheckbox");
+            if (checkbox.checked) {
+              const recId = recordDiv.getAttribute("data-record-id");
+              person.records = person.records.filter(r => String(r.id) !== recId);
+            }
+          });
+        }
+      });
+      saveData();
+      render();
+    }
+
+    // すべての記録削除（確認付き）
+    function deleteAllRecords() {
+      if (confirm("本当にすべての記録を削除しますか？")) {
+        data.persons.forEach(person => {
+          person.records = [];
+        });
+        saveData();
+        render();
+      }
+    }
+
+    // イベントリスナーの設定
+    document.getElementById("registerNameBtn").addEventListener("click", function() {
+      const nameInput = document.getElementById("nameInput");
+      const name = nameInput.value.trim();
+      if (name !== "") {
+        addPerson(name);
+        nameInput.value = "";
+      }
+    });
+
+    document.getElementById("deleteRecordsBtn").addEventListener("click", function() {
+      deleteCheckedRecords();
+    });
+
+    document.getElementById("deleteAllRecordsBtn").addEventListener("click", function() {
+      deleteAllRecords();
+    });
+
+    // 初期化：localStorageから読み込み＆描画
+    loadData();
+    render();
+  </script>
+</body>
+</html>
