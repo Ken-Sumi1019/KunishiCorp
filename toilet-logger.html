@@ -190,7 +190,11 @@
     // ボタン押下により記録を追加する関数
     function addRecord(personIndex, symbol) {
       const now = new Date();
-      const timestamp = now.toLocaleString(); // ローカルの日時文字列を取得
+      const month = ('0' + (now.getMonth() + 1)).slice(-2);
+      const day = ('0' + now.getDate()).slice(-2);
+      const hour = ('0' + now.getHours()).slice(-2);
+      const minute = ('0' + now.getMinutes()).slice(-2);
+      const timestamp = month + '/' + day + ' ' + hour + ':' + minute;
       // ユニークなIDとして日時（ミリ秒）と乱数を組み合わせる
       const record = {
         id: Date.now() + Math.floor(Math.random() * 1000),
